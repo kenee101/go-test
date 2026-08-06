@@ -34,6 +34,9 @@ func main() {
 	api.HandleFunc("/tasks/{id}", handlers.DeleteTask).Methods("DELETE")
 	api.HandleFunc("/admin/tasks", handlers.AdminGetTasks).Methods("GET")
 
+	// Serve Swagger UI and OpenAPI spec from ./docs
+	r.PathPrefix("/docs").Handler(http.StripPrefix("/docs", http.FileServer(http.Dir("docs"))))
+
 	addr := os.Getenv("ADDR")
 	if addr == "" {
 		addr = ":8080"
