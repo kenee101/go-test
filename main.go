@@ -1,54 +1,75 @@
+// @title			Task Management API
+// @version		1.0
+// @description	REST API for managing tasks with JWT-based authentication and role-based authorization.
+// @host			localhost:8080
+// @BasePath		/
+//
+// @securityDefinitions.apikey	BearerAuth
+// @in							header
+// @name						Authorization
+// @description				Type "Bearer" followed by a space and your JWT token.
 package main
 
 import (
 	"log"
 	"net/http"
-	"os"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger/v2"
+
+	_ "github.com/kenee101/go-test/docs"
+	"github.com/kenee101/go-test/internal/config"
 	"github.com/kenee101/go-test/internal/db"
 	"github.com/kenee101/go-test/internal/handlers"
 	"github.com/kenee101/go-test/internal/middleware"
 )
 
 func main() {
-	mongoDB, err := db.Connect()
+	cfg, err := config.Load()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("config: %v", err)
 	}
-	handlers.InitDB(mongoDB)
 
-	r := mux.NewRouter()
-
-	r.HandleFunc("/register", handlers.Register).Methods("POST")
-	r.HandleFunc("/login", handlers.Login).Methods("POST")
-
-	api := r.PathPrefix("/").Subrouter()
-	api.Use(middleware.AuthMiddleware)
-
-	api.HandleFunc("/tasks", handlers.CreateTask).Methods("POST")
-	api.HandleFunc("/tasks", handlers.GetTasks).Methods("GET")
-	api.HandleFunc("/tasks/{id}", handlers.GetTask).Methods("GET")
-	api.HandleFunc("/tasks/{id}", handlers.UpdateTask).Methods("PUT")
-	api.HandleFunc("/tasks/{id}", handlers.DeleteTask).Methods("DELETE")
-	api.HandleFunc("/admin/tasks", handlers.AdminGetTasks).Methods("GET")
-
-	// Serve Swagger UI and OpenAPI spec from ./docs
-	r.PathPrefix("/docs").Handler(http.StripPrefix("/docs", http.FileServer(http.Dir("docs"))))
-
-	addr := os.Getenv("ADDR")
-	if addr == "" {
-		addr = ":8080"
+	database, err := db.Connect(cfg)
+	if err != nil {
+		log.Fatalf("db: %v", err)
 	}
+
+	h := handlers.New(database, cfg.JWTSecret)
+
+	r := chi.NewRouter()
+	r.Use(chimw.Logger)
+	r.Use(chimw.Recoverer)
+
+	// Public routes
+	r.Post("/register", h.Register)
+	r.Post("/login", h.Login)
+
+	// Authenticated task routes
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+		r.Post("/tasks", h.CreateTask)
+		r.Get("/tasks", h.GetTasks)
+		r.Get("/tasks/{id}", h.GetTask)
+		r.Put("/tasks/{id}", h.UpdateTask)
+		r.Delete("/tasks/{id}", h.DeleteTask)
+		r.Get("/admin/tasks", h.AdminGetTasks)
+	})
+
+	// Swagger UI at /swagger/index.html
+	r.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"),
+	))
 
 	srv := &http.Server{
+		Addr:         cfg.Addr,
 		Handler:      r,
-		Addr:         addr,
-		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
 	}
 
-	log.Printf("listening on %s", addr)
+	log.Printf("listening on %s", cfg.Addr)
 	log.Fatal(srv.ListenAndServe())
 }

@@ -1,0 +1,352 @@
+basePath: /
+definitions:
+  handlers.loginReq:
+    properties:
+      password:
+        example: s3cr3t
+        type: string
+      username:
+        example: johndoe
+        type: string
+    type: object
+  handlers.registerReq:
+    properties:
+      password:
+        example: s3cr3t
+        type: string
+      username:
+        example: johndoe
+        type: string
+    type: object
+  handlers.taskReq:
+    properties:
+      completed:
+        example: false
+        type: boolean
+      description:
+        example: Complete the MongoDB section
+        type: string
+      title:
+        example: Learn Go
+        type: string
+    type: object
+  models.Task:
+    properties:
+      completed:
+        type: boolean
+      createdAt:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      title:
+        type: string
+      updatedAt:
+        type: string
+      userId:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API for managing tasks with JWT-based authentication and role-based
+    authorization.
+  title: Task Management API
+  version: "1.0"
+paths:
+  /admin/tasks:
+    get:
+      description: Returns every task in the system. Requires admin role.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: all tasks
+          schema:
+            items:
+              $ref: '#/definitions/models.Task'
+            type: array
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "500":
+          description: server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List all tasks (admin)
+      tags:
+      - admin
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Validates credentials and returns a signed JWT bearer token.
+      parameters:
+      - description: Login credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.loginReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: invalid request
+          schema:
+            type: string
+        "401":
+          description: invalid credentials
+          schema:
+            type: string
+        "500":
+          description: server error
+          schema:
+            type: string
+      summary: Authenticate a user
+      tags:
+      - auth
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user account with the "user" role.
+      parameters:
+      - description: Registration credentials
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.registerReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created user id
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: invalid request or username exists
+          schema:
+            type: string
+        "409":
+          description: username already exists
+          schema:
+            type: string
+        "500":
+          description: server error
+          schema:
+            type: string
+      summary: Register a new user
+      tags:
+      - auth
+  /tasks:
+    get:
+      description: Returns all tasks belonging to the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: user's tasks
+          schema:
+            items:
+              $ref: '#/definitions/models.Task'
+            type: array
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "500":
+          description: server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: List tasks
+      tags:
+      - tasks
+    post:
+      consumes:
+      - application/json
+      description: Creates a new task for the authenticated user.
+      parameters:
+      - description: Task details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.taskReq'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: created task
+          schema:
+            $ref: '#/definitions/models.Task'
+        "400":
+          description: invalid request
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "500":
+          description: server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Create a task
+      tags:
+      - tasks
+  /tasks/{id}:
+    delete:
+      description: Deletes a task by ID. Only the owner or an admin may delete.
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: no content
+          schema:
+            type: string
+        "400":
+          description: invalid id
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: not found
+          schema:
+            type: string
+        "500":
+          description: server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Delete a task
+      tags:
+      - tasks
+    get:
+      description: Returns a single task by ID. Admins can access any task; users
+        can only access their own.
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: task
+          schema:
+            $ref: '#/definitions/models.Task'
+        "400":
+          description: invalid id
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: not found
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Get a task
+      tags:
+      - tasks
+    put:
+      consumes:
+      - application/json
+      description: Updates title, description, and completed status. Only the owner
+        or an admin may update.
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated task fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.taskReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: updated task id
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: invalid id or request
+          schema:
+            type: string
+        "401":
+          description: unauthorized
+          schema:
+            type: string
+        "403":
+          description: forbidden
+          schema:
+            type: string
+        "404":
+          description: not found
+          schema:
+            type: string
+        "500":
+          description: server error
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Update a task
+      tags:
+      - tasks
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and your JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
