@@ -47,7 +47,6 @@ definitions:
       userId:
         type: string
     type: object
-host: localhost:8080
 info:
   contact: {}
   description: REST API for managing tasks with JWT-based authentication and role-based

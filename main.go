@@ -1,7 +1,6 @@
 // @title			Task Management API
 // @version		1.0
 // @description	REST API for managing tasks with JWT-based authentication and role-based authorization.
-// @host			localhost:8080
 // @BasePath		/
 //
 // @securityDefinitions.apikey	BearerAuth
