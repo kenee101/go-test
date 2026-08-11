@@ -16,25 +16,27 @@ import (
 
 type registerReq struct {
 	Username string `json:"username" example:"johndoe"`
-	Password string `json:"password" example:"s3cr3t"`
+	Email    string `json:"email"    example:"johndoe@example.com"`
+	Password string `json:"password" example:"password123"`
 }
 
 type loginReq struct {
 	Username string `json:"username" example:"johndoe"`
-	Password string `json:"password" example:"s3cr3t"`
+	Email    string `json:"email"    example:"johndoe@example.com"`
+	Password string `json:"password" example:"password123"`
 }
 
 // Register godoc
 //
 //	@Summary		Register a new user
-//	@Description	Creates a new user account with the "user" role.
+//	@Description	Creates a new user account. Both username and email must be unique.
 //	@Tags			auth
 //	@Accept			json
 //	@Produce		json
 //	@Param			body	body		registerReq			true	"Registration credentials"
 //	@Success		201		{object}	map[string]string	"created user id"
-//	@Failure		400		{string}	string				"invalid request or username exists"
-//	@Failure		409		{string}	string				"username already exists"
+//	@Failure		400		{string}	string				"missing required fields"
+//	@Failure		409		{string}	string				"username or email already exists"
 //	@Failure		500		{string}	string				"server error"
 //	@Router			/register [post]
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
@@ -43,8 +45,8 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	if req.Username == "" || req.Password == "" {
-		http.Error(w, "username and password are required", http.StatusBadRequest)
+	if req.Username == "" || req.Email == "" || req.Password == "" {
+		http.Error(w, "username, email, and password are required", http.StatusBadRequest)
 		return
 	}
 
@@ -61,6 +63,14 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := col.FindOne(ctx, bson.M{"email": req.Email}).Decode(&existing); err == nil {
+		http.Error(w, "email already exists", http.StatusConflict)
+		return
+	} else if err != mongo.ErrNoDocuments {
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
 	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, "server error", http.StatusInternalServerError)
@@ -71,6 +81,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	user := models.User{
 		ID:           bson.NewObjectID(),
 		Username:     req.Username,
+		Email:        req.Email,
 		PasswordHash: string(hashed),
 		Role:         "user",
 		CreatedAt:    now,
@@ -90,13 +101,13 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 // Login godoc
 //
 //	@Summary		Authenticate a user
-//	@Description	Validates credentials and returns a signed JWT bearer token.
+//	@Description	Accepts either username or email with password. Returns a signed JWT bearer token.
 //	@Tags			auth
 //	@Accept			json
 //	@Produce		json
-//	@Param			body	body		loginReq			true	"Login credentials"
+//	@Param			body	body		loginReq			true	"Login credentials (username or email + password)"
 //	@Success		200		{object}	map[string]string	"JWT token"
-//	@Failure		400		{string}	string				"invalid request"
+//	@Failure		400		{string}	string				"missing required fields"
 //	@Failure		401		{string}	string				"invalid credentials"
 //	@Failure		500		{string}	string				"server error"
 //	@Router			/login [post]
@@ -106,13 +117,24 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
+	if req.Password == "" || (req.Username == "" && req.Email == "") {
+		http.Error(w, "password and either username or email are required", http.StatusBadRequest)
+		return
+	}
 
 	col := h.db.Collection("users")
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
+	filter := bson.M{}
+	if req.Email != "" {
+		filter["email"] = req.Email
+	} else {
+		filter["username"] = req.Username
+	}
+
 	var user models.User
-	if err := col.FindOne(ctx, bson.M{"username": req.Username}).Decode(&user); err != nil {
+	if err := col.FindOne(ctx, filter).Decode(&user); err != nil {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}

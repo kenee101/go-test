@@ -19,6 +19,12 @@ type taskReq struct {
 	Completed   bool   `json:"completed"   example:"false"`
 }
 
+type updateTaskReq struct {
+	Title       *string `json:"title"`
+	Description *string `json:"description"`
+	Completed   *bool   `json:"completed"`
+}
+
 func (h *Handler) userFromContext(r *http.Request) (bson.ObjectID, string, bool) {
 	uid, _ := r.Context().Value(middleware.CtxUserID).(string)
 	role, _ := r.Context().Value(middleware.CtxRole).(string)
@@ -165,14 +171,14 @@ func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
 // UpdateTask godoc
 //
 //	@Summary		Update a task
-//	@Description	Updates title, description, and completed status. Only the owner or an admin may update.
+//	@Description	Partially updates a task. Only fields present in the request body are changed; omitted fields are left untouched. Only the owner or an admin may update.
 //	@Tags			tasks
 //	@Accept			json
 //	@Produce		json
 //	@Param			id		path		string				true	"Task ID"
-//	@Param			body	body		taskReq				true	"Updated task fields"
+//	@Param			body	body		updateTaskReq		true	"Fields to update (all optional)"
 //	@Success		200		{object}	map[string]string	"updated task id"
-//	@Failure		400		{string}	string				"invalid id or request"
+//	@Failure		400		{string}	string				"invalid id, request, or no fields provided"
 //	@Failure		401		{string}	string				"unauthorized"
 //	@Failure		403		{string}	string				"forbidden"
 //	@Failure		404		{string}	string				"not found"
@@ -186,9 +192,24 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req taskReq
+	var req updateTaskReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+
+	set := bson.M{"updatedAt": time.Now().UTC()}
+	if req.Title != nil {
+		set["title"] = *req.Title
+	}
+	if req.Description != nil {
+		set["description"] = *req.Description
+	}
+	if req.Completed != nil {
+		set["completed"] = *req.Completed
+	}
+	if len(set) == 1 {
+		http.Error(w, "no fields to update", http.StatusBadRequest)
 		return
 	}
 
@@ -212,15 +233,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	update := bson.M{
-		"$set": bson.M{
-			"title":       req.Title,
-			"description": req.Description,
-			"completed":   req.Completed,
-			"updatedAt":   time.Now().UTC(),
-		},
-	}
-	if _, err := col.UpdateByID(ctx, oid, update); err != nil {
+	if _, err := col.UpdateByID(ctx, oid, bson.M{"$set": set}); err != nil {
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}

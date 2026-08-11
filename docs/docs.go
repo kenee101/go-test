@@ -63,7 +63,7 @@ const docTemplate = `{
         },
         "/login": {
             "post": {
-                "description": "Validates credentials and returns a signed JWT bearer token.",
+                "description": "Accepts either username or email with password. Returns a signed JWT bearer token.",
                 "consumes": [
                     "application/json"
                 ],
@@ -76,7 +76,7 @@ const docTemplate = `{
                 "summary": "Authenticate a user",
                 "parameters": [
                     {
-                        "description": "Login credentials",
+                        "description": "Login credentials (username or email + password)",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -96,7 +96,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "invalid request",
+                        "description": "missing required fields",
                         "schema": {
                             "type": "string"
                         }
@@ -118,7 +118,7 @@ const docTemplate = `{
         },
         "/register": {
             "post": {
-                "description": "Creates a new user account with the \"user\" role.",
+                "description": "Creates a new user account. Both username and email must be unique.",
                 "consumes": [
                     "application/json"
                 ],
@@ -151,13 +151,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "invalid request or username exists",
+                        "description": "missing required fields",
                         "schema": {
                             "type": "string"
                         }
                     },
                     "409": {
-                        "description": "username already exists",
+                        "description": "username or email already exists",
                         "schema": {
                             "type": "string"
                         }
@@ -329,7 +329,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Updates title, description, and completed status. Only the owner or an admin may update.",
+                "description": "Partially updates a task. Only fields present in the request body are changed; omitted fields are left untouched. Only the owner or an admin may update.",
                 "consumes": [
                     "application/json"
                 ],
@@ -349,12 +349,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "Updated task fields",
+                        "description": "Fields to update (all optional)",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.taskReq"
+                            "$ref": "#/definitions/handlers.updateTaskReq"
                         }
                     }
                 ],
@@ -369,7 +369,7 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "invalid id or request",
+                        "description": "invalid id, request, or no fields provided",
                         "schema": {
                             "type": "string"
                         }
@@ -465,9 +465,13 @@ const docTemplate = `{
         "handlers.loginReq": {
             "type": "object",
             "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "johndoe@example.com"
+                },
                 "password": {
                     "type": "string",
-                    "example": "s3cr3t"
+                    "example": "password123"
                 },
                 "username": {
                     "type": "string",
@@ -478,9 +482,13 @@ const docTemplate = `{
         "handlers.registerReq": {
             "type": "object",
             "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "johndoe@example.com"
+                },
                 "password": {
                     "type": "string",
-                    "example": "s3cr3t"
+                    "example": "password123"
                 },
                 "username": {
                     "type": "string",
@@ -502,6 +510,20 @@ const docTemplate = `{
                 "title": {
                     "type": "string",
                     "example": "Learn Go"
+                }
+            }
+        },
+        "handlers.updateTaskReq": {
+            "type": "object",
+            "properties": {
+                "completed": {
+                    "type": "boolean"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
                 }
             }
         },
