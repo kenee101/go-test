@@ -7,67 +7,77 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRegister(t *testing.T) {
 	h := newHandler()
-	// Start each test group with a clean users collection.
 	_ = testDB.Collection("users").Drop(context.Background())
 
 	t.Run("success", func(t *testing.T) {
-		body := `{"username":"alice","password":"password123"}`
+		body := `{"username":"alice","email":"alice@example.com","password":"password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rr := httptest.NewRecorder()
 
 		h.Register(rr, req)
 
-		if rr.Code != http.StatusCreated {
-			t.Fatalf("got %d, want 201 — body: %s", rr.Code, rr.Body.String())
-		}
+		require.Equal(t, http.StatusCreated, rr.Code, "body: %s", rr.Body.String())
 		var resp map[string]string
-		if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
-			t.Fatalf("decode response: %v", err)
-		}
-		if resp["id"] == "" {
-			t.Error("expected non-empty id in response")
-		}
+		require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+		assert.NotEmpty(t, resp["id"])
 	})
 
 	t.Run("duplicate username", func(t *testing.T) {
-		body := `{"username":"alice","password":"password123"}`
+		body := `{"username":"alice","email":"alice2@example.com","password":"password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(body))
 		rr := httptest.NewRecorder()
 
 		h.Register(rr, req)
 
-		if rr.Code != http.StatusConflict {
-			t.Errorf("got %d, want 409", rr.Code)
-		}
+		assert.Equal(t, http.StatusConflict, rr.Code)
+	})
+
+	t.Run("duplicate email", func(t *testing.T) {
+		body := `{"username":"alice2","email":"alice@example.com","password":"password123"}`
+		req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(body))
+		rr := httptest.NewRecorder()
+
+		h.Register(rr, req)
+
+		assert.Equal(t, http.StatusConflict, rr.Code)
 	})
 
 	t.Run("missing username", func(t *testing.T) {
-		body := `{"username":"","password":"password123"}`
+		body := `{"username":"","email":"noname@example.com","password":"password123"}`
 		req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(body))
 		rr := httptest.NewRecorder()
 
 		h.Register(rr, req)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Errorf("got %d, want 400", rr.Code)
-		}
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
+	})
+
+	t.Run("missing email", func(t *testing.T) {
+		body := `{"username":"bob","email":"","password":"password123"}`
+		req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(body))
+		rr := httptest.NewRecorder()
+
+		h.Register(rr, req)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 	})
 
 	t.Run("missing password", func(t *testing.T) {
-		body := `{"username":"bob","password":""}`
+		body := `{"username":"bob","email":"bob@example.com","password":""}`
 		req := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(body))
 		rr := httptest.NewRecorder()
 
 		h.Register(rr, req)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Errorf("got %d, want 400", rr.Code)
-		}
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 	})
 
 	t.Run("invalid json", func(t *testing.T) {
@@ -76,9 +86,7 @@ func TestRegister(t *testing.T) {
 
 		h.Register(rr, req)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Errorf("got %d, want 400", rr.Code)
-		}
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 	})
 }
 
@@ -87,25 +95,33 @@ func TestLogin(t *testing.T) {
 	_ = testDB.Collection("users").Drop(context.Background())
 
 	// Seed a user via Register.
-	seed := `{"username":"charlie","password":"secret123"}`
-	reg := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(seed))
-	h.Register(httptest.NewRecorder(), reg)
+	seed := `{"username":"charlie","email":"charlie@example.com","password":"secret123"}`
+	h.Register(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(seed)))
 
-	t.Run("success", func(t *testing.T) {
+	t.Run("success with username", func(t *testing.T) {
 		body := `{"username":"charlie","password":"secret123"}`
 		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(body))
 		rr := httptest.NewRecorder()
 
 		h.Login(rr, req)
 
-		if rr.Code != http.StatusOK {
-			t.Fatalf("got %d, want 200 — body: %s", rr.Code, rr.Body.String())
-		}
+		require.Equal(t, http.StatusOK, rr.Code, "body: %s", rr.Body.String())
 		var resp map[string]string
-		json.NewDecoder(rr.Body).Decode(&resp)
-		if resp["token"] == "" {
-			t.Error("expected non-empty token in response")
-		}
+		require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+		assert.NotEmpty(t, resp["token"])
+	})
+
+	t.Run("success with email", func(t *testing.T) {
+		body := `{"email":"charlie@example.com","password":"secret123"}`
+		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(body))
+		rr := httptest.NewRecorder()
+
+		h.Login(rr, req)
+
+		require.Equal(t, http.StatusOK, rr.Code, "body: %s", rr.Body.String())
+		var resp map[string]string
+		require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+		assert.NotEmpty(t, resp["token"])
 	})
 
 	t.Run("wrong password", func(t *testing.T) {
@@ -115,9 +131,7 @@ func TestLogin(t *testing.T) {
 
 		h.Login(rr, req)
 
-		if rr.Code != http.StatusUnauthorized {
-			t.Errorf("got %d, want 401", rr.Code)
-		}
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
 	})
 
 	t.Run("unknown user", func(t *testing.T) {
@@ -127,9 +141,17 @@ func TestLogin(t *testing.T) {
 
 		h.Login(rr, req)
 
-		if rr.Code != http.StatusUnauthorized {
-			t.Errorf("got %d, want 401", rr.Code)
-		}
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	})
+
+	t.Run("missing identifier and password", func(t *testing.T) {
+		body := `{"password":"secret123"}`
+		req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader(body))
+		rr := httptest.NewRecorder()
+
+		h.Login(rr, req)
+
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 	})
 
 	t.Run("invalid json", func(t *testing.T) {
@@ -138,8 +160,6 @@ func TestLogin(t *testing.T) {
 
 		h.Login(rr, req)
 
-		if rr.Code != http.StatusBadRequest {
-			t.Errorf("got %d, want 400", rr.Code)
-		}
+		assert.Equal(t, http.StatusBadRequest, rr.Code)
 	})
 }

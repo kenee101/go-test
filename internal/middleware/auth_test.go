@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/kenee101/go-test/internal/middleware"
 )
 
@@ -55,9 +57,7 @@ func TestAuthMiddleware_StatusCodes(t *testing.T) {
 			}
 			rr := httptest.NewRecorder()
 			mw.ServeHTTP(rr, req)
-			if rr.Code != tc.wantStatus {
-				t.Errorf("got status %d, want %d", rr.Code, tc.wantStatus)
-			}
+			assert.Equal(t, tc.wantStatus, rr.Code)
 		})
 	}
 }
@@ -80,12 +80,8 @@ func TestAuthMiddleware_ContextValues(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	mw.ServeHTTP(httptest.NewRecorder(), req)
 
-	if gotUserID != userID {
-		t.Errorf("context user_id: got %q, want %q", gotUserID, userID)
-	}
-	if gotRole != role {
-		t.Errorf("context role: got %q, want %q", gotRole, role)
-	}
+	assert.Equal(t, userID, gotUserID)
+	assert.Equal(t, role, gotRole)
 }
 
 func TestAuthMiddleware_WrongSecret(t *testing.T) {
@@ -100,21 +96,16 @@ func TestAuthMiddleware_WrongSecret(t *testing.T) {
 	rr := httptest.NewRecorder()
 	mw.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("got %d, want 401", rr.Code)
-	}
-	if called {
-		t.Error("next handler should not have been called")
-	}
+	assert.Equal(t, http.StatusUnauthorized, rr.Code)
+	assert.False(t, called, "next handler should not have been called")
 }
 
 func TestAuthMiddleware_ContextKeyType(t *testing.T) {
 	// Middleware uses a typed contextKey, so a plain string lookup of "user_id"
 	// must return nil — the two key types are distinct in Go's context package.
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Context().Value("user_id") != nil {
-			t.Error("plain string key should not resolve the typed context key set by middleware")
-		}
+		assert.Nil(t, r.Context().Value("user_id"),
+			"plain string key should not resolve the typed context key set by middleware")
 		w.WriteHeader(http.StatusOK)
 	})
 

@@ -10,7 +10,6 @@ import (
 	"github.com/kenee101/go-test/internal/config"
 )
 
-// Connect establishes a MongoDB connection using values from cfg.
 func Connect(cfg *config.Config) (*mongo.Database, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -24,5 +23,25 @@ func Connect(cfg *config.Config) (*mongo.Database, error) {
 		return nil, err
 	}
 
-	return client.Database(cfg.MongoDB), nil
+	db := client.Database(cfg.MongoDB)
+	if err := ensureIndexes(ctx, db); err != nil {
+		return nil, err
+	}
+
+	return db, nil
+}
+
+func ensureIndexes(ctx context.Context, db *mongo.Database) error {
+	indexes := []mongo.IndexModel{
+		{
+			Keys:    map[string]int{"username": 1},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys:    map[string]int{"email": 1},
+			Options: options.Index().SetUnique(true),
+		},
+	}
+	_, err := db.Collection("users").Indexes().CreateMany(ctx, indexes)
+	return err
 }

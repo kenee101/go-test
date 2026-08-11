@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"os"
 	"testing"
@@ -33,7 +34,10 @@ func TestMain(m *testing.M) {
 
 	client, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
-		// No MongoDB available — skip all handler tests.
+		if os.Getenv("CI") != "" {
+			log.Fatal("integration tests: could not reach MongoDB")
+		}
+		log.Println("integration tests skipped: could not reach MongoDB")
 		os.Exit(0)
 	}
 

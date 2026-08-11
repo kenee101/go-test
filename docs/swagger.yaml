@@ -2,8 +2,11 @@ basePath: /
 definitions:
   handlers.loginReq:
     properties:
+      email:
+        example: johndoe@example.com
+        type: string
       password:
-        example: s3cr3t
+        example: password123
         type: string
       username:
         example: johndoe
@@ -11,8 +14,11 @@ definitions:
     type: object
   handlers.registerReq:
     properties:
+      email:
+        example: johndoe@example.com
+        type: string
       password:
-        example: s3cr3t
+        example: password123
         type: string
       username:
         example: johndoe
@@ -28,6 +34,15 @@ definitions:
         type: string
       title:
         example: Learn Go
+        type: string
+    type: object
+  handlers.updateTaskReq:
+    properties:
+      completed:
+        type: boolean
+      description:
+        type: string
+      title:
         type: string
     type: object
   models.Task:
@@ -87,9 +102,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Validates credentials and returns a signed JWT bearer token.
+      description: Accepts either username or email with password. Returns a signed
+        JWT bearer token.
       parameters:
-      - description: Login credentials
+      - description: Login credentials (username or email + password)
         in: body
         name: body
         required: true
@@ -105,7 +121,7 @@ paths:
               type: string
             type: object
         "400":
-          description: invalid request
+          description: missing required fields
           schema:
             type: string
         "401":
@@ -123,7 +139,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Creates a new user account with the "user" role.
+      description: Creates a new user account. Both username and email must be unique.
       parameters:
       - description: Registration credentials
         in: body
@@ -141,11 +157,11 @@ paths:
               type: string
             type: object
         "400":
-          description: invalid request or username exists
+          description: missing required fields
           schema:
             type: string
         "409":
-          description: username already exists
+          description: username or email already exists
           schema:
             type: string
         "500":
@@ -294,20 +310,21 @@ paths:
     put:
       consumes:
       - application/json
-      description: Updates title, description, and completed status. Only the owner
-        or an admin may update.
+      description: Partially updates a task. Only fields present in the request body
+        are changed; omitted fields are left untouched. Only the owner or an admin
+        may update.
       parameters:
       - description: Task ID
         in: path
         name: id
         required: true
         type: string
-      - description: Updated task fields
+      - description: Fields to update (all optional)
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/handlers.taskReq'
+          $ref: '#/definitions/handlers.updateTaskReq'
       produces:
       - application/json
       responses:
@@ -318,7 +335,7 @@ paths:
               type: string
             type: object
         "400":
-          description: invalid id or request
+          description: invalid id, request, or no fields provided
           schema:
             type: string
         "401":
