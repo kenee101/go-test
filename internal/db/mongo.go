@@ -4,10 +4,12 @@ import (
 	"context"
 	"time"
 
+	migrate "github.com/xakep666/mongo-migrate"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/kenee101/go-test/internal/config"
+	"github.com/kenee101/go-test/internal/db/migrations"
 )
 
 func Connect(cfg *config.Config) (*mongo.Database, error) {
@@ -24,24 +26,10 @@ func Connect(cfg *config.Config) (*mongo.Database, error) {
 	}
 
 	db := client.Database(cfg.MongoDB)
-	if err := ensureIndexes(ctx, db); err != nil {
+
+	if err := migrate.NewMigrate(db, migrations.All...).Up(ctx, migrate.AllAvailable); err != nil {
 		return nil, err
 	}
 
 	return db, nil
-}
-
-func ensureIndexes(ctx context.Context, db *mongo.Database) error {
-	indexes := []mongo.IndexModel{
-		{
-			Keys:    map[string]int{"username": 1},
-			Options: options.Index().SetUnique(true),
-		},
-		{
-			Keys:    map[string]int{"email": 1},
-			Options: options.Index().SetUnique(true),
-		},
-	}
-	_, err := db.Collection("users").Indexes().CreateMany(ctx, indexes)
-	return err
 }
