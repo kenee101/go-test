@@ -12,7 +12,6 @@ type Config struct {
 	JWTSecret string `env:"JWT_SECRET" envDefault:"secret"`
 }
 
-// Load reads environment variables (and an optional .env file) into Config.
 func Load() (*Config, error) {
 	_ = godotenv.Load() // silently ignore if .env is absent
 	cfg := &Config{}
