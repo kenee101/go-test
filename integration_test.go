@@ -26,7 +26,7 @@ const integrationDB = "taskdb_integration_test"
 var integrationServer *httptest.Server
 
 func TestMain(m *testing.M) {
-	_ = godotenv.Load(".env")
+	_ = godotenv.Load()
 
 	uri := os.Getenv("MONGO_URI")
 	if uri == "" {
