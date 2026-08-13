@@ -13,7 +13,7 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	_ = godotenv.Load() // silently ignore if .env is absent
+	_ = godotenv.Load()
 	cfg := &Config{}
 	if err := env.Parse(cfg); err != nil {
 		return nil, err

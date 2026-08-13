@@ -25,7 +25,7 @@ var testDB *mongo.Database
 
 // TestMain connects to MongoDB once, runs all handler tests, then drops the test DB.
 func TestMain(m *testing.M) {
-	_ = godotenv.Load("../../.env")
+	_ = godotenv.Load()
 
 	uri := os.Getenv("MONGO_URI")
 	if uri == "" {

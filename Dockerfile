@@ -10,17 +10,21 @@ RUN go mod download
 COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o server .
+RUN CGO_ENABLED=0 GOOS=linux go build -o migrate ./cmd/migrate
 
 # ── Run stage ──────────────────────────────────────────────────────────────────
-FROM scratch
+FROM alpine:3.21
 
-# Copy CA certificates from the builder — required for TLS connections to MongoDB Atlas
+# Copy CA certificates from builder — required for TLS connections to MongoDB Atlas
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 WORKDIR /app
 
 COPY --from=builder /app/server .
+COPY --from=builder /app/migrate .
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
 EXPOSE 8080
 
-CMD ["./server"]
+ENTRYPOINT ["./entrypoint.sh"]

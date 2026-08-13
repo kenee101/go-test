@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load(".env")
+	_ = godotenv.Load()
 
 	if len(os.Args) < 2 {
 		log.Fatal("usage: migrate <up|down> [n]")
